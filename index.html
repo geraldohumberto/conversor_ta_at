@@ -1,190 +1,80 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
-    <title>Conversor de Mídia Interativo</title>
+    <title>Conversor de Mídia - Texto para Áudio</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 600px;
             margin: 0 auto;
             padding: 20px;
+            line-height: 1.6;
         }
-
-        .tab {
-            display: none;
-        }
-
-        .tab.active {
-            display: block;
-        }
-
-        textarea,
-        input {
+        textarea {
             width: 100%;
-            margin: 10px 0;
+            min-height: 150px;
+            margin-bottom: 10px;
         }
-
         button {
-            margin: 10px 0;
             padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #audio-player {
+            margin-top: 10px;
+            width: 100%;
         }
     </style>
 </head>
-
 <body>
-    <h1>Conversor de Mídia Interativo</h1>
-
-    <div class="tabs">
-        <button onclick="showTab('tts')">Texto para Áudio</button>
-        <button onclick="showTab('stt')">Áudio para Texto</button>
+    <h1>Conversor de Texto para Áudio</h1>
+    
+    <textarea id="texto-input" placeholder="Digite o texto que deseja converter para áudio"></textarea>
+    
+    <div>
+        <button onclick="converterTextoParaAudio()">Converter para Áudio</button>
     </div>
+    
+    <audio id="audio-player" controls style="display:none;"></audio>
 
-    <div id="tts-tab" class="tab active">
-        <h2>Texto para Áudio</h2>
-        <textarea id="texto-input" rows="10" placeholder="Digite o texto para converter"></textarea>
-        <select id="tts-modo">
-            <option value="pyttsx3">Padrão (Offline)</option>
-            <option value="gtts">Google (Online)</option>
-            <option value="coqui">Coqui (Offline HD)</option>
-        </select>
-        <button onclick="converterTTS()">Converter para Áudio</button>
-        <audio id="audio-resultado" controls style="display:none;"></audio>
-    </div>
-
-    <div id="stt-tab" class="tab">
-        <h2>Áudio para Texto</h2>
-        <input type="file" id="audio-input" accept="audio/*">
-        <button onclick="converterSTT()">Transcrever Áudio</button>
-        <textarea id="texto-resultado" rows="10" readonly placeholder="Texto transcrito aparecerá aqui"></textarea>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
     <script>
-        let pyodide;
-
-        async function loadPyodide() {
-            pyodide = await globalThis.loadPyodide();
-            await pyodide.loadPackage(["micropip"]);
-            const micropip = pyodide.pyimport("micropip");
-
-            // Adicionar código Python
-            const pythonCode = `
-import js
-import io
-import base64
-
-def texto_para_mp3_pyttsx3(texto_falado):
-    import pyttsx3
-    import base64
-    
-    engine = pyttsx3.init()
-    # Salva em um BytesIO para não criar arquivo no disco
-    buffer = io.BytesIO()
-    engine.save_to_file(texto_falado, buffer)
-    engine.runAndWait()
-    
-    # Converte para base64
-    buffer.seek(0)
-    return base64.b64encode(buffer.read()).decode('utf-8')
-
-def texto_para_mp3_gtts(texto_falado):
-    from gtts import gTTS
-    import base64
-    import io
-    
-    tts = gTTS(text=texto_falado, lang='pt-br')
-    buffer = io.BytesIO()
-    tts.write_to_fp(buffer)
-    buffer.seek(0)
-    return base64.b64encode(buffer.read()).decode('utf-8')
-
-def audio_para_texto_whisper(audio_base64):
-    import whisper
-    import base64
-    import io
-    
-    # Decodifica base64
-    audio_bytes = base64.b64decode(audio_base64)
-    
-    # Salva em arquivo temporário
-    with open('temp_audio.wav', 'wb') as f:
-        f.write(audio_bytes)
-    
-    # Transcreve
-    model = whisper.load_model("base")
-    result = model.transcribe('temp_audio.wav', language="pt", fp16=False)
-    
-    return result["text"]
-`;
-
-            pyodide.runPython(pythonCode);
-        }
-
-        function showTab(tabName) {
-            const tabs = document.querySelectorAll('.tab');
-            tabs.forEach(tab => tab.classList.remove('active'));
-            document.getElementById(`${tabName}-tab`).classList.add('active');
-        }
-
-        async function converterTTS() {
-            if (!pyodide) await loadPyodide();
-
-            const texto = document.getElementById('texto-input').value;
-            const modo = document.getElementById('tts-modo').value;
-            const audioElemento = document.getElementById('audio-resultado');
-
-            try {
-                let audioBase64;
-                if (modo === 'pyttsx3') {
-                    audioBase64 = pyodide.runPython(`texto_para_mp3_pyttsx3("${texto}")`);
-                } else if (modo === 'gtts') {
-                    audioBase64 = pyodide.runPython(`texto_para_mp3_gtts("${texto}")`);
-                } else {
-                    alert('Modo Coqui não implementado nesta versão web');
-                    return;
-                }
-
-                audioElemento.src = `data:audio/wav;base64,${audioBase64}`;
-                audioElemento.style.display = 'block';
-                audioElemento.play();
-            } catch (error) {
-                alert(`Erro na conversão: ${error}`);
-            }
-        }
-
-        async function converterSTT() {
-            if (!pyodide) await loadPyodide();
-
-            const audioInput = document.getElementById('audio-input');
-            const textoResultado = document.getElementById('texto-resultado');
-
-            if (audioInput.files.length === 0) {
-                alert('Selecione um arquivo de áudio');
+        async function converterTextoParaAudio() {
+            const texto = document.getElementById('texto-input').value.trim();
+            const audioPlayer = document.getElementById('audio-player');
+            
+            if (!texto) {
+                alert('Por favor, digite um texto para converter.');
                 return;
             }
 
-            const arquivo = audioInput.files[0];
-            const leitor = new FileReader();
-
-            leitor.onload = async (e) => {
-                const audioBase64 = e.target.result.split(',')[1];
-
+            try {
+                // Codifica o texto para URL para evitar problemas com caracteres especiais
+                const textoEncoded = encodeURIComponent(texto);
+                
+                // URL da API do gTTS
+                const gttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pt-BR&q=${textoEncoded}`;
+                
+                // Define a fonte do áudio
+                audioPlayer.src = gttsUrl;
+                
+                // Mostra o player de áudio
+                audioPlayer.style.display = 'block';
+                
+                // Tenta reproduzir o áudio
                 try {
-                    const texto = pyodide.runPython(`audio_para_texto_whisper("${audioBase64}")`);
-                    textoResultado.value = texto;
-                } catch (error) {
-                    alert(`Erro na transcrição: ${error}`);
+                    await audioPlayer.play();
+                } catch (playError) {
+                    console.error('Erro ao reproduzir áudio:', playError);
+                    alert('Não foi possível reproduzir o áudio automaticamente. Clique no botão de play.');
                 }
-            };
-
-            leitor.readAsDataURL(arquivo);
+            } catch (error) {
+                console.error('Erro na conversão de texto para áudio:', error);
+                alert('Ocorreu um erro ao converter o texto para áudio.');
+            }
         }
-
-        // Inicializa Pyodide
-        loadPyodide();
     </script>
 </body>
-
 </html>
