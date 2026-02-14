@@ -47,7 +47,7 @@
     <div id="tts-tab" class="tab active">
         <h2>Texto para Áudio</h2>
         
-        <textarea id="texto-input" rows="10" placeholder="Digite o texto para converter"></textarea>
+        <textarea id="texto-input" rows="10" placeholder="Digite o texto para converter (máximo 200 caracteres)"></textarea>
         
         <div class="modo-tts">
             <label>
@@ -83,7 +83,7 @@
             document.getElementById(`${tabName}-tab`).classList.add('active');
         }
 
-        function converterTextoParaAudio() {
+        async function converterTextoParaAudio() {
             const texto = document.getElementById('texto-input').value.trim();
             const modoSelecionado = document.querySelector('input[name="tts-modo"]:checked').value;
             const audioPlayer = document.getElementById('audio-player');
@@ -94,24 +94,57 @@
                 return;
             }
 
+            // Limita o texto para evitar problemas com a API
+            const textoLimitado = texto.slice(0, 200);
+
             if (modoSelecionado === 'gtts') {
-                // Modo Google TTS
-                const textoEncoded = encodeURIComponent(texto);
-                const gttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pt-BR&q=${textoEncoded}`;
-                
-                audioPlayer.src = gttsUrl;
-                audioPlayer.style.display = 'block';
-                downloadButton.style.display = 'block';
-                
-                audioPlayer.onloadedmetadata = () => {
-                    try {
-                        audioPlayer.play();
-                    } catch (playError) {
-                        console.error('Erro ao reproduzir:', playError);
+                try {
+                    // Cria múltiplas requisições para contornar limitações de tamanho
+                    const partes = [];
+                    const palavras = textoLimitado.split(' ');
+                    let parteAtual = '';
+
+                    for (const palavra of palavras) {
+                        if ((parteAtual + ' ' + palavra).length > 100) {
+                            partes.push(parteAtual.trim());
+                            parteAtual = palavra;
+                        } else {
+                            parteAtual += ' ' + palavra;
+                        }
                     }
-                };
+                    if (parteAtual) partes.push(parteAtual.trim());
+
+                    // Gera URLs para cada parte
+                    const audioUrls = partes.map(parte => 
+                        `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pt-BR&q=${encodeURIComponent(parte)}`
+                    );
+
+                    // Cria um blob de áudio concatenado
+                    const audioBlobs = await Promise.all(audioUrls.map(async (url) => {
+                        const response = await fetch(url);
+                        return await response.blob();
+                    }));
+
+                    const audioBlob = new Blob(audioBlobs, { type: 'audio/mp3' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+
+                    // Configura o player de áudio
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.style.display = 'block';
+                    downloadButton.style.display = 'block';
+
+                    // Tenta reproduzir
+                    try {
+                        await audioPlayer.play();
+                    } catch (playError) {
+                        console.warn('Reprodução automática bloqueada:', playError);
+                    }
+
+                } catch (error) {
+                    console.error('Erro na conversão de texto para áudio:', error);
+                    alert('Não foi possível converter o texto para áudio. Verifique sua conexão.');
+                }
             } else {
-                // Modo Offline (Simulado)
                 alert('Modo offline não disponível na versão web.');
             }
         }
@@ -142,9 +175,7 @@
             
             leitor.onload = (e) => {
                 // Simula transcrição (na realidade, precisaria de um serviço de STT)
-                textoResultado.value = 'Transcrição simulada: O áudio contém o texto do arquivo selecionado.';
-                
-                // Em um cenário real, você usaria uma API de STT como Google Speech-to-Text ou similar
+                textoResultado.value = `Transcrição simulada do arquivo: ${arquivo.name}\n\nNa versão completa, usaríamos um serviço de conversão de áudio para texto.`;
             };
             
             leitor.readAsDataURL(arquivo);
