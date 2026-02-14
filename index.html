@@ -2,78 +2,152 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Conversor de Mídia - Texto para Áudio</title>
+    <title>Conversor de Mídia Interativo</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
             padding: 20px;
             line-height: 1.6;
         }
-        textarea {
+        .tab {
+            display: none;
+        }
+        .tab.active {
+            display: block;
+        }
+        textarea, input {
             width: 100%;
-            min-height: 150px;
-            margin-bottom: 10px;
+            margin: 10px 0;
         }
         button {
+            margin: 10px 5px;
             padding: 10px;
             background-color: #4CAF50;
             color: white;
             border: none;
             cursor: pointer;
         }
-        #audio-player {
-            margin-top: 10px;
-            width: 100%;
+        .modo-tts {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
-    <h1>Conversor de Texto para Áudio</h1>
-    
-    <textarea id="texto-input" placeholder="Digite o texto que deseja converter para áudio"></textarea>
+    <h1>Conversor de Mídia Interativo</h1>
     
     <div>
-        <button onclick="converterTextoParaAudio()">Converter para Áudio</button>
+        <button onclick="showTab('tts')">Texto para Áudio</button>
+        <button onclick="showTab('stt')">Áudio para Texto</button>
     </div>
-    
-    <audio id="audio-player" controls style="display:none;"></audio>
+
+    <div id="tts-tab" class="tab active">
+        <h2>Texto para Áudio</h2>
+        
+        <textarea id="texto-input" rows="10" placeholder="Digite o texto para converter"></textarea>
+        
+        <div class="modo-tts">
+            <label>
+                <input type="radio" name="tts-modo" value="gtts" checked> Google TTS (Online)
+            </label>
+            <label>
+                <input type="radio" name="tts-modo" value="offline"> Modo Offline (Simulado)
+            </label>
+        </div>
+        
+        <button onclick="converterTextoParaAudio()">Converter</button>
+        
+        <div>
+            <audio id="audio-player" controls style="display:none; width:100%;"></audio>
+            <button id="download-audio" style="display:none;" onclick="downloadAudio()">Baixar Áudio</button>
+        </div>
+    </div>
+
+    <div id="stt-tab" class="tab">
+        <h2>Áudio para Texto</h2>
+        
+        <input type="file" id="audio-input" accept="audio/*">
+        
+        <button onclick="converterAudioParaTexto()">Transcrever</button>
+        
+        <textarea id="texto-resultado" rows="10" readonly placeholder="Texto transcrito aparecerá aqui"></textarea>
+    </div>
 
     <script>
-        async function converterTextoParaAudio() {
+        function showTab(tabName) {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        function converterTextoParaAudio() {
             const texto = document.getElementById('texto-input').value.trim();
+            const modoSelecionado = document.querySelector('input[name="tts-modo"]:checked').value;
             const audioPlayer = document.getElementById('audio-player');
+            const downloadButton = document.getElementById('download-audio');
             
             if (!texto) {
                 alert('Por favor, digite um texto para converter.');
                 return;
             }
 
-            try {
-                // Codifica o texto para URL para evitar problemas com caracteres especiais
+            if (modoSelecionado === 'gtts') {
+                // Modo Google TTS
                 const textoEncoded = encodeURIComponent(texto);
-                
-                // URL da API do gTTS
                 const gttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=pt-BR&q=${textoEncoded}`;
                 
-                // Define a fonte do áudio
                 audioPlayer.src = gttsUrl;
-                
-                // Mostra o player de áudio
                 audioPlayer.style.display = 'block';
+                downloadButton.style.display = 'block';
                 
-                // Tenta reproduzir o áudio
-                try {
-                    await audioPlayer.play();
-                } catch (playError) {
-                    console.error('Erro ao reproduzir áudio:', playError);
-                    alert('Não foi possível reproduzir o áudio automaticamente. Clique no botão de play.');
-                }
-            } catch (error) {
-                console.error('Erro na conversão de texto para áudio:', error);
-                alert('Ocorreu um erro ao converter o texto para áudio.');
+                audioPlayer.onloadedmetadata = () => {
+                    try {
+                        audioPlayer.play();
+                    } catch (playError) {
+                        console.error('Erro ao reproduzir:', playError);
+                    }
+                };
+            } else {
+                // Modo Offline (Simulado)
+                alert('Modo offline não disponível na versão web.');
             }
+        }
+
+        function downloadAudio() {
+            const audioPlayer = document.getElementById('audio-player');
+            const texto = document.getElementById('texto-input').value.trim();
+            
+            if (audioPlayer.src) {
+                const link = document.createElement('a');
+                link.href = audioPlayer.src;
+                link.download = `audio_${texto.substring(0, 20)}.mp3`;
+                link.click();
+            }
+        }
+
+        function converterAudioParaTexto() {
+            const audioInput = document.getElementById('audio-input');
+            const textoResultado = document.getElementById('texto-resultado');
+            
+            if (audioInput.files.length === 0) {
+                alert('Por favor, selecione um arquivo de áudio.');
+                return;
+            }
+
+            const arquivo = audioInput.files[0];
+            const leitor = new FileReader();
+            
+            leitor.onload = (e) => {
+                // Simula transcrição (na realidade, precisaria de um serviço de STT)
+                textoResultado.value = 'Transcrição simulada: O áudio contém o texto do arquivo selecionado.';
+                
+                // Em um cenário real, você usaria uma API de STT como Google Speech-to-Text ou similar
+            };
+            
+            leitor.readAsDataURL(arquivo);
         }
     </script>
 </body>
